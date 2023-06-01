@@ -1,91 +1,106 @@
-
-import urllib.request,sys,time
-from bs4 import BeautifulSoup
-import requests
-import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-import warnings
 import json
+import re
+from selenium.common import exceptions as EX
+import logging
+import time
 
-keyword = "Walmart"
-pagesToGet= 5
-def warning_on_one_line(message, category, filename, lineno, line=None):
-    return '%s:%s: %s:\n%s\n' % (filename, lineno, category.__name__, message)
-warnings.formatwarning = warning_on_one_line
-warnings.simplefilter('always', UserWarning)
-
-def getLinks(keyword, pagesToGet):
-    if pagesToGet < 1:
-        warnings.warn("Can't get less than 1 pages")
+def getLinks(keyPhrase, numLinks, webdriverOptions=None):
+    if numLinks < 1:
         return []
-    browser = webdriver.Chrome()
+    # Reformat keyphrase
+    keyPhrase = re.sub(r"[^\w\s]", '', keyPhrase)
+    keyPhrase = re.sub(r"\s+", '%20', keyPhrase)
+    # Start selenium browser
+    browser = webdriver.Chrome(options=webdriverOptions)
     wait = WebDriverWait(browser, 10)
-
-    url = 'https://www.forbes.com/search/?q=' + keyword
-    browser.get(url)
-
-    # Wait until results are loaded
-    # elems = wait.until(lambda d: d.find_elements(By.XPATH, "//article//h2[@class='title']/a[@href]"))
-
-    # Press load more
-    for page in range(2, pagesToGet + 1):
-        # Get next page
+    browser.get(f'https://www.forbes.com/search/?q={keyPhrase}')
+    elems = wait.until(lambda d: d.find_elements(By.XPATH, "//article//h3/a[@href]"))
+    # Do while not numLinks
+    while len(elems) < numLinks:
+        logging.root.info(f"Getting new page...")
         try:
-            browser.find_element(By.CLASS_NAME, "search-more").click()
-        except:
-            warnings.warn("Stuck attempting to get page %d, skipping..." % page)
+            # Click load more
+            elem = wait.until(lambda d: d.find_element(By.CLASS_NAME, "search-more"))
+            elem.click()
+        except EX.TimeoutException: # If wait timed out
+            logging.root.warning(f"Requested {numLinks} links, only found {len(elems)}, skipping...")
+            break
+        except EX.NoSuchWindowException as err:
+            raise err
+        except Exception as err: # Otherwise
+            logging.root.warning(f'{type(err)} Line: {err}')
+            logging.root.warning(f"Stuck attempting to get new page, skipping...")
             break
         time.sleep(1)
-
-    elems = browser.find_elements(By.XPATH, "//article//h3/a[@href]")
+        elems = browser.find_elements(By.XPATH, "//article//h3/a[@href]")
     return [elem.get_attribute("href") for elem in elems]
 
 
-# links = getLinks(keyword, pagesToGet)
-# print(links)
-# print(len(links))
-# df = pd.DataFrame(links, columns=['URL'])
-# df.to_csv('data/forbes_links.csv', index=False)
+# def getContent(links):
+#     options = webdriver.ChromeOptions()
+#     options.add_argument('--ignore-certificate-errors-spki-list')
+#     options.add_argument('--ignore-certificate-error')
+#     options.add_argument('--ignore-ssl-errors')
+#     options.add_argument('--incognito')
+#     browser = webdriver.Chrome(options=options)
+#     contents = []
+
+#     for link in links:
+#         # Just skip over video results for now
+#         if "www.forbes.com/video" in link:
+#             continue
+#         try:
+#             browser.delete_all_cookies()
+#             browser.get(link)
+#             # Get headline and description
+#             el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
+#             parsed_el = json.loads(el.get_attribute("innerHTML"))
+#             headline = parsed_el['headline']
+#             description = parsed_el['description']
+#             # Get article body
+#             elems = browser.find_elements(By.XPATH, "//div[contains(concat(' ', @class, ' '), ' article-body ')]/p")
+#             articleBody = ' '.join([elem.text for elem in elems])
+#             contents.append({'Headline': headline, 'Description': description, 'Content': articleBody})
+#         except:
+#             error_type, error_obj, error_info = sys.exc_info()
+#             warnings.warn('ERROR FOR LINK: %s' % str(link))
+#             warnings.warn('%s\nLine: %s' % (str(error_type), str(error_info.tb_lineno)))
+#             continue
+
+#     return contents
 
 
-def getContent(links):
-    options = webdriver.ChromeOptions()
-    options.add_argument('--ignore-certificate-errors-spki-list')
-    options.add_argument('--ignore-certificate-error')
-    options.add_argument('--ignore-ssl-errors')
-    options.add_argument('--incognito')
-    browser = webdriver.Chrome(options=options)
+def getJSONFromLinks(links, webdriverOptions=None):
+    # Start selenium browser
+    browser = webdriver.Chrome(options=webdriverOptions)
     contents = []
-
+    count = 0
     for link in links:
-        # Just skip over video results for now
-        if "www.forbes.com/video" in link:
-            continue
+        count += 1
+        logging.root.info(f"({count}/{len(links)}) Visiting {link}...")
         try:
-            browser.delete_all_cookies()
+            # Get link
             browser.get(link)
-            # Get headline and description
+            # Find json data
             el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
-            parsed_el = json.loads(el.get_attribute("innerHTML"))
-            headline = parsed_el['headline']
-            description = parsed_el['description']
-            # Get article body
+            jsonDict = json.loads(el.get_attribute("innerHTML"))
+            # Add articleBody
             elems = browser.find_elements(By.XPATH, "//div[contains(concat(' ', @class, ' '), ' article-body ')]/p")
-            articleBody = ' '.join([elem.text for elem in elems])
-            contents.append({'Headline': headline, 'Description': description, 'Content': articleBody})
-        except:
-            error_type, error_obj, error_info = sys.exc_info()
-            warnings.warn('ERROR FOR LINK: %s' % str(link))
-            warnings.warn('%s\nLine: %s' % (str(error_type), str(error_info.tb_lineno)))
+            jsonDict['articleBody'] = ' '.join([elem.text for elem in elems])
+            contents.append(jsonDict)
+        except EX.NoSuchWindowException as err:
+            raise err
+        except Exception as err:
+            logging.root.warning(f"{type(err)}: {err}")
+            logging.root.warning(f"Error for link {link}, skipping...")
             continue
-
     return contents
 
-df = pd.read_csv('data/forbes_links.csv')
-links = df['URL'].values.tolist()
-contents = getContent(links)
-df = pd.DataFrame(contents)
-df.to_csv('data/forbes_contents.csv', index=False)
+
+def getJSON(keyPhrase, numLinks, webdriverOptions=None):
+    links = getLinks(keyPhrase, numLinks, webdriverOptions)
+    return getJSONFromLinks(links, webdriverOptions)
+

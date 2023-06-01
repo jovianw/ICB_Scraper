@@ -1,104 +1,105 @@
 
-import urllib.request,sys,time
-from bs4 import BeautifulSoup
-import requests
-import pandas as pd
 from selenium import webdriver
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.common import exceptions as EX
+import re
+import logging
+import json
 
-keyword = "Walmart"
-pagesToGet= 5
-
-
-def getLinks(keyword, pagesToGet):
-    browser = webdriver.Chrome()
+def getLinks(keyPhrase, numLinks, webdriverOptions=None):
+    if numLinks < 1:
+        return []
     links = []
-
+    # Calculate pages
+    pagesToGet = -(numLinks // -50)
+    # Reformat keyphrase
+    keyPhrase = re.sub(r"[^\w\s]", '', keyPhrase)
+    keyPhrase = re.sub(r"\s+", '+', keyPhrase)
+    # Start selenium browser
+    browser = webdriver.Chrome(options=webdriverOptions)
+    wait = WebDriverWait(browser, 10)
     for page in range(1, pagesToGet + 1):
-        print('processing page :', page)
-        url = "https://www.cnn.com/search?q=" + keyword + "&from=" + str(50 * (page - 1)) + "&size=50&page=" + str(page) + "&sort=relevance&types=all&section="
-        print(url)
-        
-        #an exception might be thrown, so the code should be in a try-except block
+        logging.root.info(f"Getting page {page}...")
+        size = numLinks if numLinks < 50 else 50
+        url = f"https://www.cnn.com/search?q={keyPhrase}&from={50 * (page - 1)}&size={size}&page={page}&sort=relevance&types=article&section="
+        # Get next page
         try:
-            #use the browser to get the url. This is suspicious command that might blow up.
             browser.get(url)
-        except Exception as e:
-            error_type, error_obj, error_info = sys.exc_info()
-            print ('ERROR FOR LINK:', url)
-            print (error_type, 'Line:', error_info.tb_lineno)
-            continue #ignore this page. Abandon this and go back.
-        time.sleep(2)   
-        html = browser.page_source
-        soup = BeautifulSoup(html, 'html.parser')
-        for article in soup.find_all(class_='container__link'):
-            links.append(article.get('href'))
-
+            # Get all links
+            elems = wait.until(lambda d: d.find_elements(By.CLASS_NAME, "container__link"))
+            links.extend([elem.get_attribute("href") for elem in elems])
+        except EX.TimeoutException: # If wait timed out
+            logging.root.warning(f"Requested {numLinks} links ({pagesToGet} pages), only found {page} pages, skipping...")
+            break
+        except EX.NoSuchWindowException as err:
+            raise err
+        except Exception as err: # Otherwise
+            logging.root.warning(f'{type(err)} Line: {err}')
+            logging.root.warning(f"Stuck attempting to get page {page}, skipping...")
+            break
     return links
 
 
-# links = getLinks(keyword, pagesToGet)
-# df = pd.DataFrame(links, columns=['URL'])
-# df.to_csv('cnn_links.csv', index=False)
+# def getContentFromLinks(links, webdriverOptions=None):
+#     # Start selenium browser
+#     browser = webdriver.Chrome(options=webdriverOptions)
+#     contents = []
+#     count = 0
+#     for link in links:
+#         count += 1
+#         logging.root.info(f"({count}/{len(links)}) Visiting {link}...")
+#         try:
+#             # Get link
+#             browser.get(link)
+#             # Find json data
+#             el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
+#             parsed_el = json.loads(el.get_attribute("innerHTML"))
+#             contents.append({'Headline': parsed_el['headline'], 'Description': parsed_el['description'], 'Content': parsed_el['articleBody']})
+#         except EX.NoSuchWindowException as err:
+#             raise err
+#         except Exception as err:
+#             logging.root.warning(f"{type(err)}: {err}")
+#             logging.root.warning(f"Error for link {link}, skipping...")
+#             continue
+#     return contents
 
 
-def getContent(links):
-    def isContent(tag):
-        if tag.has_attr('id') and tag['id'] == 'storytext':
-            return True
-        if tag.has_attr('class') and 'article__content' in tag['class']:
-            return True
-        return False
-
-    options = webdriver.ChromeOptions()
-    options.add_argument('--ignore-certificate-errors-spki-list')
-    options.add_argument('--ignore-certificate-error')
-    options.add_argument('--ignore-ssl-errors')
-    options.add_argument('--incognito')
-    browser = webdriver.Chrome(options=options)
+def getJSONFromLinks(links, webdriverOptions=None):
+    # Start selenium browser
+    browser = webdriver.Chrome(options=webdriverOptions)
+    wait = WebDriverWait(browser, 10)
     contents = []
-    
     count = 0
-    totalCount = len(links)
     for link in links:
         count += 1
-        print(f'Processing article {count}/{totalCount}')
-
-        # filter out video articles
-        if "cnn.com/video" in link:
-            continue
-
+        logging.root.info(f"({count}/{len(links)}) Visiting {link}...")
         try:
-            #use the browser to get the url. This is suspicious command that might blow up.
+            # Get link
             browser.get(link)
-        except Exception as e:
-            error_type, error_obj, error_info = sys.exc_info()
-            print ('ERROR FOR LINK:', link)
-            print (error_type, 'Line:', error_info.tb_lineno)
-            continue #ignore this page. Abandon this and go back.
-        time.sleep(2)   
-        # Get HTML
-        html = browser.page_source
-        soup = BeautifulSoup(html, 'html.parser')
-        # Get headline
-        headlineDiv = soup.find('h1', class_=['article-title', 'headline__text'])
-        if headlineDiv: 
-            headline = headlineDiv.string.strip()
-        else:
-            headline = ""
-        # Get content
-        content = ""
-        contentDiv = soup.find(isContent)
-        if contentDiv:
-            for paragraph in contentDiv.find_all('p'):
-                content += "".join(paragraph.strings)
-        contents.append({'Headline': headline, 'Content': content})
-    print('Done')
+            if "money.cnn.com" in link:
+                # Find metadata
+                elems = wait.until(lambda d: d.find_elements(By.XPATH, "//meta[@name][@content]"))
+                jsonDict = {}
+                for elem in elems:
+                    jsonDict[elem.get_attribute("name")] = elem.get_attribute("content")
+                contents.append(jsonDict)
+            else:
+                # Find json data
+                el = wait.until(lambda d: d.find_element(By.XPATH, "//script[@type='application/ld+json']"))
+                contents.append(json.loads(el.get_attribute("innerHTML")))
+        except EX.TimeoutException: # If wait timed out
+            logging.root.warning(f"Can't find content of page {link}, skipping...")
+            break
+        except EX.NoSuchWindowException as err:
+            raise err
+        except Exception as err:
+            logging.root.warning(f"{type(err)}: {err}")
+            logging.root.warning(f"Error for link {link}, skipping...")
+            continue
     return contents
 
 
-df = pd.read_csv('data/cnn_links.csv')
-links = df['URL'].values.tolist()
-contents = getContent(links)
-df = pd.DataFrame(contents)
-df.to_csv('data/cnn_contents.csv', index=False)
-    
+def getJSON(keyPhrase, numLinks, webdriverOptions=None):
+    links = getLinks(keyPhrase, numLinks, webdriverOptions)
+    return getJSONFromLinks(links, webdriverOptions)
