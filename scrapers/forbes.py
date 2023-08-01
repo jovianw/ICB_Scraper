@@ -39,40 +39,6 @@ def getLinks(keyPhrase, numLinks, webdriverOptions=None):
     return [elem.get_attribute("href") for elem in elems]
 
 
-# def getContent(links):
-#     options = webdriver.ChromeOptions()
-#     options.add_argument('--ignore-certificate-errors-spki-list')
-#     options.add_argument('--ignore-certificate-error')
-#     options.add_argument('--ignore-ssl-errors')
-#     options.add_argument('--incognito')
-#     browser = webdriver.Chrome(options=options)
-#     contents = []
-
-#     for link in links:
-#         # Just skip over video results for now
-#         if "www.forbes.com/video" in link:
-#             continue
-#         try:
-#             browser.delete_all_cookies()
-#             browser.get(link)
-#             # Get headline and description
-#             el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
-#             parsed_el = json.loads(el.get_attribute("innerHTML"))
-#             headline = parsed_el['headline']
-#             description = parsed_el['description']
-#             # Get article body
-#             elems = browser.find_elements(By.XPATH, "//div[contains(concat(' ', @class, ' '), ' article-body ')]/p")
-#             articleBody = ' '.join([elem.text for elem in elems])
-#             contents.append({'Headline': headline, 'Description': description, 'Content': articleBody})
-#         except:
-#             error_type, error_obj, error_info = sys.exc_info()
-#             warnings.warn('ERROR FOR LINK: %s' % str(link))
-#             warnings.warn('%s\nLine: %s' % (str(error_type), str(error_info.tb_lineno)))
-#             continue
-
-#     return contents
-
-
 def getJSONFromLinks(links, webdriverOptions=None):
     # Start selenium browser
     browser = webdriver.Chrome(options=webdriverOptions)

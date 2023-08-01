@@ -16,6 +16,11 @@ verbose = True
 keyPhrase = "Walmart Groceries"
 numLinks = 18
 options = webdriver.ChromeOptions()
-options.add_experimental_option('excludeSwitches', ['enable-logging'])
+options.add_experimental_option('excludeSwitches', ['enable-logging']) # Ignore non-breaking selenium output
+options.page_load_strategy = 'eager'
 
-runAllJSON(keyPhrase, numLinks)
+# runAllJSON(keyPhrase, numLinks)
+
+jsonList = scrapers.reuters.getJSON(keyPhrase=keyPhrase, numLinks=numLinks, webdriverOptions=options)
+with open(f"data/{scrapers.reuters.__name__}.json", "w") as outfile:
+    json.dump(jsonList, outfile)

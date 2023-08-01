@@ -42,24 +42,6 @@ def getLinks(keyPhrase, numLinks, webdriverOptions=None):
     return links
 
 
-# def getContent(links):
-#     browser = webdriver.Chrome(options=webdriverOptions)
-#     contents = []
-
-#     for link in links:
-#         try:
-#             browser.get(link)
-#             el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
-#             parsed_el = json.loads(el.get_attribute("innerHTML"))
-#             contents.append({'Headline': parsed_el['headline'], 'Description': parsed_el['description'], 'Content': parsed_el.get('articleBody')})
-#         except Exception as err:
-#             warnings.warn(f"{type(err)}: {err}")
-#             warnings.warn('ERROR FOR LINK:', link)
-#             continue
-
-#     return contents
-
-
 def getJSONFromLinks(links, webdriverOptions=None):
     # Start selenium browser
     browser = webdriver.Chrome(options=webdriverOptions)

@@ -3,6 +3,7 @@
 
 # Other
 *.env
+sandbox.py
 
 # User-specific files
 *.rsuser
@@ -397,3 +398,6 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Data folder
+data/

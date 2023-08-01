@@ -41,30 +41,6 @@ def getLinks(keyPhrase, numLinks, webdriverOptions=None):
     return links
 
 
-# def getContentFromLinks(links, webdriverOptions=None):
-#     # Start selenium browser
-#     browser = webdriver.Chrome(options=webdriverOptions)
-#     contents = []
-#     count = 0
-#     for link in links:
-#         count += 1
-#         logging.root.info(f"({count}/{len(links)}) Visiting {link}...")
-#         try:
-#             # Get link
-#             browser.get(link)
-#             # Find json data
-#             el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
-#             parsed_el = json.loads(el.get_attribute("innerHTML"))
-#             contents.append({'Headline': parsed_el['headline'], 'Description': parsed_el['description'], 'Content': parsed_el['articleBody']})
-#         except EX.NoSuchWindowException as err:
-#             raise err
-#         except Exception as err:
-#             logging.root.warning(f"{type(err)}: {err}")
-#             logging.root.warning(f"Error for link {link}, skipping...")
-#             continue
-#     return contents
-
-
 def getJSONFromLinks(links, webdriverOptions=None):
     # Start selenium browser
     browser = webdriver.Chrome(options=webdriverOptions)

@@ -1,11 +1,10 @@
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.common.by import By
-from selenium.common import exceptions as EX
-import logging
 import json
 import re
-
+from selenium.common import exceptions as EX
+import logging
 
 def getLinks(keyPhrase, numLinks, webdriverOptions=None):
     if numLinks < 1:
@@ -13,20 +12,19 @@ def getLinks(keyPhrase, numLinks, webdriverOptions=None):
     links = []
     # Reformat keyphrase
     keyPhrase = re.sub(r"[^\w\s]", '', keyPhrase)
-    keyPhrase = re.sub(r"\s+", '+', keyPhrase)
+    keyPhrase = re.sub(r"\s+", '%20', keyPhrase)
     # Start selenium browser
     browser = webdriver.Chrome(options=webdriverOptions)
     wait = WebDriverWait(browser, 10)
-    page = 0
+    page = 1
     # Do while not numLinks
     while True:
         logging.root.info(f"Getting new page...")
         try:
-            browser.get(f'https://www.businessinsider.com/s?q={keyPhrase}&p={page}')
+            browser.get(f'https://abcnews.go.com/search?searchtext={keyPhrase}&type=Story&page={page}')
             # Get all links
-            elems = wait.until(
-                lambda d: d.find_elements(By.XPATH, 
-                                          "//section[contains(concat(' ', @class, ' '), ' js-feed-item ')]//a[contains(concat(' ', @class, ' '), ' tout-title-link ')][@href]"))
+            elems = wait.until(lambda d: d.find_elements(By.XPATH, 
+                                                         "//div[contains(concat(' ', @class, ' '), ' ContentRoll__Headline ')]/h2/a[@href]"))
             links.extend([elem.get_attribute("href") for elem in elems])
         except EX.TimeoutException: # If wait timed out
             logging.root.warning(f"Requested {numLinks} links, only found {len(links)}, skipping...")
@@ -47,6 +45,7 @@ def getLinks(keyPhrase, numLinks, webdriverOptions=None):
 def getJSONFromLinks(links, webdriverOptions=None):
     # Start selenium browser
     browser = webdriver.Chrome(options=webdriverOptions)
+    wait = WebDriverWait(browser, 10)
     contents = []
     count = 0
     for link in links:
@@ -55,9 +54,16 @@ def getJSONFromLinks(links, webdriverOptions=None):
         try:
             # Get link
             browser.get(link)
-            # Find json data
+            # Find metadata
             el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
-            contents.append(json.loads(el.get_attribute("innerHTML")))
+            jsonDict = json.loads(el.get_attribute("innerHTML"))
+            # Add articleBody
+            if "goodmorningamerica.com" in link:
+                elems = wait.until(lambda d: d.find_elements(By.XPATH, "//section[contains(concat(' ', @class, ' '), ' article-body ')]//div[contains(concat(' ', @class, ' '), ' fitt-tracker ')]//p"))
+            else:
+                elems = wait.until(lambda d: d.find_elements(By.XPATH, "//article/p"))
+            jsonDict['articleBody'] = ' '.join([elem.text for elem in elems])
+            contents.append(jsonDict)
         except EX.NoSuchWindowException as err:
             raise err
         except Exception as err:
@@ -69,4 +75,5 @@ def getJSONFromLinks(links, webdriverOptions=None):
 
 def getJSON(keyPhrase, numLinks, webdriverOptions=None):
     links = getLinks(keyPhrase, numLinks, webdriverOptions)
+    print(links)
     return getJSONFromLinks(links, webdriverOptions)

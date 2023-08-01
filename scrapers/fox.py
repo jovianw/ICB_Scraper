@@ -39,28 +39,6 @@ def getLinks(keyPhrase, numLinks, webdriverOptions=None):
     return [elem.get_attribute("href") for elem in elems]
 
 
-# def getContent(links):
-#     browser = webdriver.Chrome(options=webdriverOptions)
-#     contents = []
-
-#     for link in links:
-#         # Just skip over video results for now
-#         if "www.foxnews.com/video" in link:
-#             continue
-#         try:
-#             browser.get(link)
-#             el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
-#             parsed_el = json.loads(el.get_attribute("innerHTML"))
-#             contents.append({'Headline': parsed_el['headline'], 'Description': parsed_el['description'], 'Content': parsed_el['articleBody']})
-#         except:
-#             error_type, error_obj, error_info = sys.exc_info()
-#             print ('ERROR FOR LINK:', link)
-#             print (error_type, 'Line:', error_info.tb_lineno)
-#             continue
-
-#     return contents
-
-
 def getJSONFromLinks(links, webdriverOptions=None):
     # Start selenium browser
     browser = webdriver.Chrome(options=webdriverOptions)

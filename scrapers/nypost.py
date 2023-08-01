@@ -42,32 +42,6 @@ def getLinks(keyPhrase, numLinks, webdriverOptions=None):
     return links
 
 
-# def getContent(links):
-#     browser = webdriver.Chrome(options=webdriverOptions)
-#     wait = WebDriverWait(browser, 10)
-#     contents = []
-
-#     for link in links:
-#         try:
-#             browser.get(link)
-#             # Get headline and description
-#             headline_el = wait.until(lambda d: d.find_element(By.XPATH, "//meta[@name='sailthru.title']"))
-#             headline = headline_el.get_attribute("content")
-#             description_el = browser.find_element(By.XPATH, "//meta[@name='sailthru.description']")
-#             description = description_el.get_attribute("content")
-#             # Get article body
-#             elems = browser.find_elements(By.XPATH, "//div[contains(concat(' ', @class, ' '), ' entry-content ')]/p")
-#             articleBody = ' '.join([elem.text for elem in elems])
-#             contents.append({'Headline': headline, 'Description': description, 'Content': articleBody})
-#         except:
-#             error_type, _, error_info = sys.exc_info()
-#             warnings.warn('ERROR FOR LINK: %s' % str(link))
-#             warnings.warn('%s\nLine: %s' % (str(error_type), str(error_info.tb_lineno)))
-#             continue
-
-#     return contents
-
-
 def getJSONFromLinks(links, webdriverOptions=None):
     # Start selenium browser
     browser = webdriver.Chrome(options=webdriverOptions)

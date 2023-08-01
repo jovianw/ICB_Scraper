@@ -30,38 +30,6 @@ def getLinks(keyPhrase, numLinks, webdriverOptions=None):
     return links
 
 
-# links = getLinks(keyword, pagesToGet)
-# print(links)
-# print(len(links))
-# df = pd.DataFrame(links, columns=['URL'])
-# df.to_csv('data/nytimes_links.csv', index=False)
-
-
-# def getContent(keyword, pagesToGet, verbose=0):
-#     contents = []
-#     if pagesToGet < 1:
-#         return []
-#     if pagesToGet >= 100:
-#         logging.root.warning("Too many pages requested, should be <100")
-#         pagesToGet = 100
-#     url = 'https://api.nytimes.com/svc/search/v2/articlesearch.json'
-#     for page in range(pagesToGet):
-#         if page > 0: # Avoid API request limit
-#             time.sleep(12)
-#         if verbose == 1:
-#             print("Getting page", page)
-#         params = {'q': keyword, 'api-key': API_KEY, 'type_of_material.contains': 'Text', 'page': page}
-#         response = requests.get(url, params=params)
-#         if response.json()['status'] != 'OK':
-#             logging.root.warning(response.json()['errors'][0])
-#         if response.json()['response']['meta']['offset'] > response.json()['response']['meta']['hits']:
-#             logging.root.warning("Only " + str(page-1) + " hits found, " + str(pagesToGet) + " requested. Exiting.")
-#             break
-#         articles = response.json()['response']['docs']
-#         contents.extend([{'Headline': doc['headline']['main'], 'Description': doc['abstract'], 'Content': doc['lead_paragraph']} for doc in articles])
-#     return contents
-
-
 def getJSON(keyPhrase, numLinks, webdriverOptions=None):
     contents = []
     if numLinks < 1:
