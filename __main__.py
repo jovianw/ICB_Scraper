@@ -173,8 +173,8 @@ parser_set.set_defaults(func=mainSet)
 
 ##### READ #####
 parser_read = subparsers.add_parser('read', 
-                                   help='prints current defaults configuration',
-                                   description='Prints current defaults configuration.')
+                                   help='prints info and current defaults configuration',
+                                   description='Prints info and current defaults configuration.')
 parser_read.set_defaults(func=mainRead)
 
 
