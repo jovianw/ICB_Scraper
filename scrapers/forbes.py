@@ -1,72 +1,26 @@
-from selenium import webdriver
-from selenium.webdriver.support.wait import WebDriverWait
-from selenium.webdriver.common.by import By
-import json
-import re
-from selenium.common import exceptions as EX
-import logging
-import time
+from scrapers.common.scraper import WebScraper
+from scrapers.common.helpers import *
 
-def getLinks(keyPhrase, numLinks, webdriverOptions=None):
-    if numLinks < 1:
-        return []
-    # Reformat keyphrase
-    keyPhrase = re.sub(r"[^\w\s]", '', keyPhrase)
-    keyPhrase = re.sub(r"\s+", '%20', keyPhrase)
-    # Start selenium browser
-    browser = webdriver.Chrome(options=webdriverOptions)
-    wait = WebDriverWait(browser, 10)
-    browser.get(f'https://www.forbes.com/search/?q={keyPhrase}')
-    elems = wait.until(lambda d: d.find_elements(By.XPATH, "//article//h3/a[@href]"))
-    # Do while not numLinks
-    while len(elems) < numLinks:
-        logging.root.info(f"Getting new page...")
-        try:
-            # Click load more
-            elem = wait.until(lambda d: d.find_element(By.CLASS_NAME, "search-more"))
-            elem.click()
-        except EX.TimeoutException: # If wait timed out
-            logging.root.warning(f"Requested {numLinks} links, only found {len(elems)}, skipping...")
-            break
-        except EX.NoSuchWindowException as err:
-            raise err
-        except Exception as err: # Otherwise
-            logging.root.warning(f'{type(err)} Line: {err}')
-            logging.root.warning(f"Stuck attempting to get new page, skipping...")
-            break
-        time.sleep(1)
-        elems = browser.find_elements(By.XPATH, "//article//h3/a[@href]")
-    return [elem.get_attribute("href") for elem in elems]
+class Scraper(GetLinksScrollMixin, GetJSONFromLinksMixin, WebScraper):
+    def __init__(self, patience=10, webdriverOptions=None):
+        self.patience = patience
+        self.webdriverOptions = webdriverOptions
+        self.name = "Forbes"
 
+    def getSearchLink(*args, **kwargs):
+        return f"https://www.forbes.com/search/?q={kwargs['keyPhrase']}"
 
-def getJSONFromLinks(links, webdriverOptions=None):
-    # Start selenium browser
-    browser = webdriver.Chrome(options=webdriverOptions)
-    contents = []
-    count = 0
-    for link in links:
-        count += 1
-        logging.root.info(f"({count}/{len(links)}) Visiting {link}...")
-        try:
-            # Get link
-            browser.get(link)
-            # Find json data
-            el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
-            jsonDict = json.loads(el.get_attribute("innerHTML"))
-            # Add articleBody
-            elems = browser.find_elements(By.XPATH, "//div[contains(concat(' ', @class, ' '), ' article-body ')]/p")
-            jsonDict['articleBody'] = ' '.join([elem.text for elem in elems])
-            contents.append(jsonDict)
-        except EX.NoSuchWindowException as err:
-            raise err
-        except Exception as err:
-            logging.root.warning(f"{type(err)}: {err}")
-            logging.root.warning(f"Error for link {link}, skipping...")
-            continue
-    return contents
+    def getLinksFromSearch(self, d):
+        return d.find_elements(By.XPATH, "//article//h3/a[contains(@href,'/sites/')]")
+    
+    def getSearchButton(self, d):
+        return d.find_element(By.CLASS_NAME, "search-more")
 
-
-def getJSON(keyPhrase, numLinks, webdriverOptions=None):
-    links = getLinks(keyPhrase, numLinks, webdriverOptions)
-    return getJSONFromLinks(links, webdriverOptions)
-
+    def getArticleData(self, browser, wait, link):
+        # Find json data
+        el = browser.find_element(By.XPATH, "//script[@type='application/ld+json']")
+        jsonDict = json.loads(el.get_attribute("innerHTML"))
+        # Add articleBody
+        elems = browser.find_elements(By.XPATH, "//div[contains(concat(' ', @class, ' '), ' article-body ')]/p")
+        jsonDict['articleBody'] = ' '.join([elem.text for elem in elems])
+        return jsonDict
